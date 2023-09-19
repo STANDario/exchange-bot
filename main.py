@@ -20,27 +20,35 @@ async def request(url):
             return
 
 
-async def get_exchange(count):
+async def get_exchange(url, day_for_url):
 
-    result_for_all_days = []
+    result_for_day = {}
+
+    result = await request(url)
+    if result:
+        valuta_for_day = {}
+        exc = list(filter(lambda el: el["currency"] == "USD" or el["currency"] == "EUR", [i for i in result["exchangeRate"]]))
+
+        for valuta in exc:
+            valuta_for_day[valuta["currency"]] = {"sale": valuta["saleRate"], "purchase": valuta["purchaseRate"]}
+
+        result_for_day[day_for_url] = valuta_for_day
+
+    return result_for_day
+
+
+async def main(count):
     day = datetime.now().date()
+    r = []
 
     for _ in range(count):
         str_day = str(day).split("-")
         day_for_url = f"{str_day[2]}.{str_day[1]}.{str_day[0]}"
-        result = await request(f"https://api.privatbank.ua/p24api/exchange_rates?date={day_for_url}")
-        if result:
-            valuta_for_day = {}
-            exc = list(filter(lambda el: el["currency"] == "USD" or el["currency"] == "EUR", [i for i in result["exchangeRate"]]))
-
-            for valuta in exc:
-                valuta_for_day[valuta["currency"]] = {"sale": valuta["saleRate"], "purchase": valuta["purchaseRate"]}
-
-            result_for_all_days.append({day_for_url: valuta_for_day})
-
+        url = f"https://api.privatbank.ua/p24api/exchange_rates?date={day_for_url}"
+        r.append(get_exchange(url, day_for_url))
         day = day - timedelta(days=1)
 
-    return result_for_all_days
+    return await asyncio.gather(*r)
 
 
 if __name__ == '__main__':
@@ -72,5 +80,5 @@ if __name__ == '__main__':
     if platform.system() == 'Windows':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    x = asyncio.run(get_exchange(count))
+    x = asyncio.run(main(count))
     print(x)
